@@ -1,0 +1,6 @@
+{
+  "name": "Apex Motors & AutoSpa",
+  "description": "Silicon Valley's premier certified pre-owned luxury dealership and concourse detailing studio website, featuring interactive 150-point inspection certification, instant trade-in appraisal, car catalog comparisons, and online auto spa appointment booking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
