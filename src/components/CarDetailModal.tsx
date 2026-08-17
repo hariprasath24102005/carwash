@@ -97,6 +97,10 @@ export const CarDetailModal: React.FC<CarDetailModalProps> = ({
                     <img
                       src={car.images[activeImageIdx]}
                       alt={`${car.make} ${car.model}`}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=1200&q=80';
+                      }}
                       className="w-full h-full object-cover transition-all duration-300"
                     />
                     {/* Gallery Navigation Arrows */}

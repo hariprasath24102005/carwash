@@ -29,7 +29,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ onSuccess, onC
   // Step 1 Form States
   const [username, setUsername] = useState('hari');
   const [adminEmail, setAdminEmail] = useState('dharshikapharma@gmail.com');
-  const [password, setPassword] = useState('Hari2');
+  const [password, setPassword] = useState('2005');
   const [loginError, setLoginError] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
@@ -46,21 +46,22 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ onSuccess, onC
     setLoginError('');
 
     const cleanUser = username.trim().toLowerCase();
-    const cleanEmail = adminEmail.trim();
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
-    // Validate admin credentials (hari / Hari2)
+    // Validate admin credentials strictly (hari / 2005 / dharshikapharma@gmail.com)
     if (cleanUser !== 'hari') {
-      setLoginError('Invalid Administrator username. Username must be "hari".');
+      setLoginError('Invalid Administrator user ID. User ID must be "hari".');
       return;
     }
 
-    if (password !== 'Hari2') {
-      setLoginError('Incorrect password. Please enter the valid admin password.');
+    if (cleanPassword !== '2005') {
+      setLoginError('Incorrect password. Password must be "2005".');
       return;
     }
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setLoginError('Please enter a valid administrator email address to receive the OTP.');
+    if (cleanEmail !== 'dharshikapharma@gmail.com') {
+      setLoginError('Invalid Administrator email ID. Email must be "dharshikapharma@gmail.com".');
       return;
     }
 
@@ -290,10 +291,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ onSuccess, onC
               <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-100 dark:border-blue-900/60 flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200 block">
-                    Default Administrator:
+                    Administrator Credentials:
                   </span>
-                  <span className="text-[11px] font-mono text-blue-600 dark:text-blue-400 font-bold">
-                    Username: <span className="underline">hari</span> • Password: <span className="underline">Hari2</span>
+                  <span className="text-[11px] font-mono text-blue-600 dark:text-blue-400 font-bold block">
+                    User: <span className="underline">hari</span> • Pass: <span className="underline">2005</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                    OTP Email: dharshikapharma@gmail.com
                   </span>
                 </div>
                 <button
@@ -301,9 +305,9 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ onSuccess, onC
                   onClick={() => {
                     setUsername('hari');
                     setAdminEmail('dharshikapharma@gmail.com');
-                    setPassword('Hari2');
+                    setPassword('2005');
                   }}
-                  className="px-2.5 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700"
+                  className="px-2.5 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 cursor-pointer"
                 >
                   Fill
                 </button>
@@ -324,14 +328,34 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ onSuccess, onC
                   <span>Security OTP Dispatched</span>
                 </div>
                 <p className="text-[11px] text-cyan-800 dark:text-cyan-300 leading-relaxed">
-                  We have sent a 6-digit one-time verification code directly to your email inbox:
+                  Verification OTP dispatched for <span className="font-mono font-bold text-blue-700 dark:text-blue-300">{adminEmail}</span>.
                 </p>
-                <div className="font-semibold text-xs text-blue-700 dark:text-blue-300 bg-white/60 dark:bg-slate-900/60 px-3 py-1.5 rounded-lg border border-cyan-200/50 dark:border-cyan-800/50 inline-block font-mono">
-                  {adminEmail}
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Please open your email and enter the 6-digit code below to authenticate.
-                </p>
+                
+                {/* Development & Sandbox OTP Quick Pass Banner */}
+                {generatedOtp && (
+                  <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 rounded-xl text-amber-900 dark:text-amber-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400 block">
+                          Preview One-Time Passcode (OTP):
+                        </span>
+                        <span className="text-xl font-mono font-black tracking-widest text-amber-900 dark:text-amber-100">
+                          {generatedOtp}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEnteredOtp(generatedOtp)}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-all"
+                      >
+                        Auto-Fill OTP
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80 block mt-1">
+                      (Code generated and dispatched to your email address)
+                    </span>
+                  </div>
+                )}
               </div>
 
               {otpSentFeedback && (

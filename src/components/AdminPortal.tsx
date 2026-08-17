@@ -36,7 +36,8 @@ import {
   Inbox,
   RefreshCw,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Database
 } from 'lucide-react';
 import { Car, BookingAppointment, BookingSlot, VehicleType, VehicleCondition, FuelType } from '../types';
 import { WASH_PACKAGES, WASH_ADDONS } from '../data/washPackages';
@@ -53,6 +54,7 @@ import {
 } from '../services/gmailService';
 import { AdminLoginModal } from './AdminLoginModal';
 import { GmailHubSection } from './GmailHubSection';
+import { SupabaseSyncSection } from './SupabaseSyncSection';
 
 interface AdminPortalProps {
   cars: Car[];
@@ -122,7 +124,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   });
 
   // Active Admin Section Tab
-  const [activeSection, setActiveSection] = useState<'timings' | 'cars' | 'appointments' | 'gmail' | 'overview'>('appointments');
+  const [activeSection, setActiveSection] = useState<'timings' | 'cars' | 'appointments' | 'gmail' | 'overview' | 'supabase'>('appointments');
 
   // Gmail Hub Tab State
   const [gmailMessages, setGmailMessages] = useState<GmailMessageItem[]>([]);
@@ -472,19 +474,41 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const handleAddImage = () => {
     if (imageUrlInput.trim()) {
-      setCarForm((prev) => ({
-        ...prev,
-        images: [...(prev.images || []), imageUrlInput.trim()]
-      }));
+      const trimmed = imageUrlInput.trim();
+      setCarForm((prev) => {
+        const currentImages = prev.images || [];
+        // Put the new image at the front or add it
+        return {
+          ...prev,
+          images: [trimmed, ...currentImages.filter((img) => img !== trimmed)]
+        };
+      });
       setImageUrlInput('');
     }
   };
 
+  const handleSetPrimaryImage = (index: number) => {
+    setCarForm((prev) => {
+      const current = [...(prev.images || [])];
+      if (index >= 0 && index < current.length) {
+        const [selected] = current.splice(index, 1);
+        return {
+          ...prev,
+          images: [selected, ...current]
+        };
+      }
+      return prev;
+    });
+  };
+
   const handleRemoveImage = (index: number) => {
-    setCarForm((prev) => ({
-      ...prev,
-      images: (prev.images || []).filter((_, i) => i !== index)
-    }));
+    setCarForm((prev) => {
+      const filtered = (prev.images || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        images: filtered.length > 0 ? filtered : [SAMPLE_CAR_IMAGES[0]]
+      };
+    });
   };
 
   // --- Timings Handlers ---
@@ -716,6 +740,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <span>Gmail Hub & Dispatch</span>
               <span className="px-1.5 py-0.5 text-[9px] rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
                 ACTIVE
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveSection('supabase')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeSection === 'supabase'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Database className="w-4 h-4 text-emerald-400" />
+              <span>Supabase Cloud Sync</span>
+              <span className="px-1.5 py-0.5 text-[9px] rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                CONNECTED
               </span>
             </button>
           </div>
@@ -1356,6 +1395,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             />
           )}
 
+          {/* ========================================================
+              TAB 6: SUPABASE POSTGRESQL CLOUD SYNC & DATABASE
+             ======================================================== */}
+          {activeSection === 'supabase' && (
+            <SupabaseSyncSection
+              cars={cars}
+              onUpdateCars={onUpdateCars}
+              bookings={bookings}
+              onUpdateBookings={onUpdateBookings}
+            />
+          )}
+
         </div>
       </div>
 
@@ -1617,24 +1668,72 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               {/* Photos Gallery */}
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Image Gallery URLs
+                  Vehicle Images (Primary image is shown on cards & catalog)
                 </label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="url"
-                    placeholder="Paste image URL..."
+                    placeholder="Paste image URL (e.g. https://...)..."
                     value={imageUrlInput}
                     onChange={(e) => setImageUrlInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddImage();
+                      }
+                    }}
                     className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium"
                   />
                   <button
                     type="button"
                     onClick={handleAddImage}
-                    className="px-3 py-2 bg-slate-800 text-white font-bold rounded-xl"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors cursor-pointer"
                   >
-                    Add URL
+                    Set / Add URL
                   </button>
                 </div>
+
+                {/* Active Vehicle Photos Gallery with Primary Indicator & Delete */}
+                {carForm.images && carForm.images.length > 0 && (
+                  <div className="mb-3 space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      Active Photos ({carForm.images.length}) — Click photo to set as Cover:
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {carForm.images.map((img, idx) => (
+                        <div
+                          key={idx}
+                          className={`relative group rounded-xl overflow-hidden border-2 transition-all aspect-video bg-slate-950 ${
+                            idx === 0 ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <img
+                            src={img}
+                            alt={`Car photo ${idx + 1}`}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => handleSetPrimaryImage(idx)}
+                          />
+                          {idx === 0 && (
+                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9px] font-bold shadow">
+                              COVER
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage(idx);
+                            }}
+                            title="Remove image"
+                            className="absolute top-1 right-1 p-1 rounded-full bg-black/70 hover:bg-rose-600 text-white transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Preset Picker */}
                 <div className="text-[11px] text-slate-400 mb-1">Or choose a curated studio image:</div>
@@ -1644,8 +1743,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       key={idx}
                       src={img}
                       alt="Sample"
-                      onClick={() => setCarForm({ ...carForm, images: [img] })}
-                      className="w-16 h-12 object-cover rounded-lg border-2 border-slate-700 hover:border-blue-500 cursor-pointer shrink-0"
+                      onClick={() => setCarForm((prev) => ({ ...prev, images: [img, ...(prev.images || []).filter(i => i !== img)] }))}
+                      className="w-16 h-12 object-cover rounded-lg border-2 border-slate-700 hover:border-blue-500 cursor-pointer shrink-0 transition-all hover:scale-105"
                     />
                   ))}
                 </div>

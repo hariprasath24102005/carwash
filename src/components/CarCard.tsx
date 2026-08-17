@@ -238,10 +238,13 @@ export const CarCard: React.FC<CarCardProps> = ({
           className="relative w-full h-44 flex items-center justify-center z-10"
         >
           <img
-            src={car.images[0]}
+            src={car.images && car.images.length > 0 ? car.images[0] : 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=1200&q=80'}
             alt={`${car.year} ${car.make} ${car.model}`}
             loading="lazy"
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=1200&q=80';
+            }}
             className="w-full h-full object-cover rounded-xl shadow-md transition-all duration-300 group-hover:shadow-2xl"
           />
 

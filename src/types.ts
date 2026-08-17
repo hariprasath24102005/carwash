@@ -4,6 +4,7 @@ export type FuelType = 'Gasoline' | 'Electric' | 'Hybrid' | 'Plug-in Hybrid';
 
 export interface Car {
   id: string;
+  userId?: string;
   make: string;
   model: string;
   year: number;
@@ -29,6 +30,13 @@ export interface Car {
   carfaxClean: boolean;
   topSpeed: number;
   mpgOrRange: string;
+}
+
+export interface PropertyLike {
+  id: string;
+  userId: string;
+  carId: string;
+  createdAt: string;
 }
 
 export interface WashPackage {

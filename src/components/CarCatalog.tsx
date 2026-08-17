@@ -29,6 +29,8 @@ interface CarCatalogProps {
   onOpenCompareModal: () => void;
   favoriteCarIds: string[];
   onToggleFavorite: (car: Car) => void;
+  onOpenCreateListing?: () => void;
+  isLoggedIn?: boolean;
 }
 
 const VEHICLE_TYPES: (string)[] = ['All Types', 'Coupe', 'Sedan', 'SUV', 'Sports', 'EV / Hybrid', 'Convertible'];
@@ -44,6 +46,8 @@ export const CarCatalog: React.FC<CarCatalogProps> = ({
   onOpenCompareModal,
   favoriteCarIds,
   onToggleFavorite,
+  onOpenCreateListing,
+  isLoggedIn,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('All Types');
@@ -139,17 +143,30 @@ export const CarCatalog: React.FC<CarCatalogProps> = ({
           </p>
         </div>
 
-        {/* Floating Compare Matrix Button if cars selected */}
-        {comparedCars.length > 0 && (
-          <button
-            id="btn-view-comparison"
-            onClick={onOpenCompareModal}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/30 flex items-center gap-2 animate-bounce transition-all"
-          >
-            <Layers className="w-4 h-4" />
-            <span>Compare Matrix ({comparedCars.length} Selected)</span>
-          </button>
-        )}
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-2">
+          {onOpenCreateListing && (
+            <button
+              id="btn-catalog-list-vehicle"
+              onClick={onOpenCreateListing}
+              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/25 flex items-center gap-2 cursor-pointer transition-all"
+            >
+              <CarIcon className="w-4 h-4" />
+              <span>List Your Vehicle</span>
+            </button>
+          )}
+
+          {comparedCars.length > 0 && (
+            <button
+              id="btn-view-comparison"
+              onClick={onOpenCompareModal}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/30 flex items-center gap-2 animate-bounce transition-all cursor-pointer"
+            >
+              <Layers className="w-4 h-4" />
+              <span>Compare Matrix ({comparedCars.length})</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search Bar & Fast Controls Bar */}

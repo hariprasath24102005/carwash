@@ -11,9 +11,24 @@ import { CarCompareModal } from './components/CarCompareModal';
 import { BookingConfirmationModal } from './components/BookingConfirmationModal';
 import { MyBookingsDrawer } from './components/MyBookingsDrawer';
 import { AdminPortal } from './components/AdminPortal';
+import { AuthModal } from './components/AuthModal';
+import { UserProfileModal } from './components/UserProfileModal';
+import { UserCarListingModal } from './components/UserCarListingModal';
 import { Car, BookingAppointment, BookingSlot } from './types';
 import { MOCK_CARS } from './data/mockCars';
 import { TIME_SLOTS } from './data/washPackages';
+import { 
+  supabase,
+  fetchCarsFromSupabase, 
+  fetchBookingsFromSupabase, 
+  saveBookingToSupabase, 
+  deleteBookingFromSupabase,
+  fetchUserLikedCarIds,
+  likeCarInSupabase,
+  unlikeCarInSupabase,
+  fetchUserListings,
+  deleteCarFromSupabase
+} from './services/supabaseClient';
 import { 
   Sparkles, 
   ShieldCheck, 
@@ -33,6 +48,12 @@ export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'catalog' | 'booking'>('catalog');
 
+  // Supabase Auth State
+  const [authUser, setAuthUser] = useState<any | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
+  const [authActionPrompt, setAuthActionPrompt] = useState<string | undefined>();
+
   // Modals & Drawers
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [comparedCars, setComparedCars] = useState<Car[]>([]);
@@ -40,6 +61,11 @@ export default function App() {
   const [activeConfirmedBooking, setActiveConfirmedBooking] = useState<BookingAppointment | null>(null);
   const [isBookingsDrawerOpen, setIsBookingsDrawerOpen] = useState(false);
   const [isAdminPortalOpen, setIsAdminPortalOpen] = useState(false);
+
+  // User Car Listings
+  const [isListingModalOpen, setIsListingModalOpen] = useState(false);
+  const [editingCar, setEditingCar] = useState<Car | null>(null);
+  const [userListings, setUserListings] = useState<Car[]>([]);
 
   // Cross-flow car selection for wash booking
   const [preselectedWashCar, setPreselectedWashCar] = useState<Car | null>(null);
@@ -148,6 +174,68 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Supabase Auth Listener & Initial User Check
+  useEffect(() => {
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setAuthUser(session.user);
+        // Hydrate liked cars from cloud
+        fetchUserLikedCarIds().then((likedIds) => {
+          if (likedIds && likedIds.length > 0) {
+            setFavoriteCarIds(likedIds);
+          }
+        });
+        // Hydrate user listings
+        fetchUserListings().then((listings) => {
+          if (listings) setUserListings(listings);
+        });
+      }
+    });
+
+    // 2. Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserLikedCarIds().then((likedIds) => {
+          if (likedIds && likedIds.length > 0) {
+            setFavoriteCarIds(likedIds);
+          }
+        });
+        fetchUserListings().then((listings) => {
+          if (listings) setUserListings(listings);
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Initial Supabase cloud fetch to hydrate real-time database state
+  useEffect(() => {
+    const hydrateFromSupabase = async () => {
+      try {
+        const [cloudCars, cloudBookings] = await Promise.all([
+          fetchCarsFromSupabase(),
+          fetchBookingsFromSupabase(),
+        ]);
+
+        if (cloudCars && cloudCars.length > 0) {
+          setCars(cloudCars);
+        }
+        if (cloudBookings && cloudBookings.length > 0) {
+          setSavedBookings(cloudBookings);
+        }
+      } catch (err) {
+        console.warn('Initial Supabase sync check:', err);
+      }
+    };
+
+    hydrateFromSupabase();
+  }, []);
+
   // Persist cars inventory
   useEffect(() => {
     try {
@@ -176,10 +264,73 @@ export default function App() {
     } catch {}
   }, [savedBookings]);
 
-  const handleToggleFavorite = (car: Car) => {
-    setFavoriteCarIds((prev) =>
-      prev.includes(car.id) ? prev.filter((id) => id !== car.id) : [...prev, car.id]
-    );
+  // Handle Likes / Saved Properties with Supabase Auth Protection
+  const handleToggleFavorite = async (car: Car) => {
+    if (!authUser) {
+      setAuthActionPrompt('Please sign in or create an account to save vehicles to your personal garage.');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    const isCurrentlyLiked = favoriteCarIds.includes(car.id);
+    
+    // Optimistic UI update
+    if (isCurrentlyLiked) {
+      setFavoriteCarIds((prev) => prev.filter((id) => id !== car.id));
+      await unlikeCarInSupabase(car.id);
+    } else {
+      setFavoriteCarIds((prev) => [...prev, car.id]);
+      await likeCarInSupabase(car.id);
+    }
+  };
+
+  // Open Create Listing with Auth Check
+  const handleOpenCreateListing = () => {
+    if (!authUser) {
+      setAuthActionPrompt('Please sign in or create an account to list your vehicle in the Apex Motors showroom.');
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setEditingCar(null);
+    setIsListingModalOpen(true);
+  };
+
+  const handleListingSaved = (savedCar: Car) => {
+    // Update main catalog
+    setCars((prev) => {
+      const exists = prev.some((c) => c.id === savedCar.id);
+      if (exists) {
+        return prev.map((c) => (c.id === savedCar.id ? savedCar : c));
+      }
+      return [savedCar, ...prev];
+    });
+
+    // Update user listings state
+    setUserListings((prev) => {
+      const exists = prev.some((c) => c.id === savedCar.id);
+      if (exists) {
+        return prev.map((c) => (c.id === savedCar.id ? savedCar : c));
+      }
+      return [savedCar, ...prev];
+    });
+  };
+
+  const handleDeleteListing = async (carId: string) => {
+    if (confirm('Are you sure you want to remove this vehicle listing?')) {
+      setCars((prev) => prev.filter((c) => c.id !== carId));
+      setUserListings((prev) => prev.filter((c) => c.id !== carId));
+      await deleteCarFromSupabase(carId);
+    }
+  };
+
+  const handleEditListing = (car: Car) => {
+    setEditingCar(car);
+    setIsListingModalOpen(true);
+  };
+
+  const handleRemoveSavedCar = async (carId: string) => {
+    setFavoriteCarIds((prev) => prev.filter((id) => id !== carId));
+    await unlikeCarInSupabase(carId);
   };
 
   const handleToggleCompare = (car: Car) => {
@@ -210,11 +361,19 @@ export default function App() {
   const handleBookingConfirmed = (newBooking: BookingAppointment) => {
     setSavedBookings((prev) => [newBooking, ...prev]);
     setActiveConfirmedBooking(newBooking);
+    // Background async persist to Supabase
+    saveBookingToSupabase(newBooking).catch((err) => {
+      console.warn('Background Supabase booking persist:', err);
+    });
   };
 
   const handleCancelBooking = (bookingId: string) => {
     if (confirm('Are you sure you want to cancel this appointment reservation?')) {
       setSavedBookings((prev) => prev.filter((b) => b.id !== bookingId));
+      // Background async delete from Supabase
+      deleteBookingFromSupabase(bookingId).catch((err) => {
+        console.warn('Background Supabase booking delete:', err);
+      });
     }
   };
 
@@ -246,6 +405,13 @@ export default function App() {
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         onOpenAdmin={() => setIsAdminPortalOpen(true)}
         onNavigateSection={scrollToSection}
+        authUser={authUser}
+        onOpenAuthModal={() => {
+          setAuthActionPrompt(undefined);
+          setIsAuthModalOpen(true);
+        }}
+        onOpenUserProfile={() => setIsUserProfileOpen(true)}
+        onOpenCreateListing={handleOpenCreateListing}
       />
 
       {/* Main Website View Container */}
@@ -262,6 +428,8 @@ export default function App() {
               onOpenCompareModal={() => setIsCompareModalOpen(true)}
               favoriteCarIds={favoriteCarIds}
               onToggleFavorite={handleToggleFavorite}
+              onOpenCreateListing={handleOpenCreateListing}
+              isLoggedIn={!!authUser}
             />
 
             {/* Instant Trade-In & Appraisal Section */}
@@ -500,6 +668,54 @@ export default function App() {
           bookings={savedBookings}
           onUpdateBookings={setSavedBookings}
           onClose={() => setIsAdminPortalOpen(false)}
+        />
+      )}
+
+      {/* Supabase Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(user) => {
+          setAuthUser(user);
+          fetchUserLikedCarIds().then((likedIds) => {
+            if (likedIds) setFavoriteCarIds(likedIds);
+          });
+          fetchUserListings().then((listings) => {
+            if (listings) setUserListings(listings);
+          });
+        }}
+        actionPrompt={authActionPrompt}
+      />
+
+      {/* User Profile Page / Dashboard Modal */}
+      <UserProfileModal
+        isOpen={isUserProfileOpen}
+        onClose={() => setIsUserProfileOpen(false)}
+        user={authUser}
+        onSignOut={() => {
+          setAuthUser(null);
+          setUserListings([]);
+        }}
+        savedCars={cars.filter((car) => favoriteCarIds.includes(car.id))}
+        userListings={userListings}
+        onSelectCar={(car) => setSelectedCar(car)}
+        onRemoveSavedCar={handleRemoveSavedCar}
+        onOpenCreateListing={handleOpenCreateListing}
+        onEditListing={handleEditListing}
+        onDeleteListing={handleDeleteListing}
+      />
+
+      {/* User Car Listing Modal (Create / Edit) */}
+      {isListingModalOpen && authUser && (
+        <UserCarListingModal
+          isOpen={isListingModalOpen}
+          onClose={() => {
+            setIsListingModalOpen(false);
+            setEditingCar(null);
+          }}
+          onSuccess={handleListingSaved}
+          editingCar={editingCar}
+          currentUserId={authUser.id}
         />
       )}
     </div>

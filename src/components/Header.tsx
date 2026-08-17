@@ -17,7 +17,10 @@ import {
   Phone,
   MapPin,
   TrendingUp,
-  HelpCircle
+  HelpCircle,
+  User,
+  LogIn,
+  Plus
 } from 'lucide-react';
 import { isSoundEnabled, setSoundEnabled, playTurboEngineRev } from '../utils/audio';
 
@@ -33,6 +36,10 @@ interface HeaderProps {
   onToggleDarkMode: () => void;
   onOpenAdmin: () => void;
   onNavigateSection?: (sectionId: string) => void;
+  authUser: any | null;
+  onOpenAuthModal: () => void;
+  onOpenUserProfile: () => void;
+  onOpenCreateListing: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -46,7 +53,11 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode,
   onToggleDarkMode,
   onOpenAdmin,
-  onNavigateSection
+  onNavigateSection,
+  authUser,
+  onOpenAuthModal,
+  onOpenUserProfile,
+  onOpenCreateListing,
 }) => {
   const [soundOn, setSoundOnState] = React.useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -188,6 +199,49 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Tools & Badges */}
         <div className="flex items-center gap-2">
+          {/* User Auth Profile / Sign In Button */}
+          {authUser ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                id="btn-nav-user-profile"
+                onClick={onOpenUserProfile}
+                className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-blue-600/15 to-cyan-600/15 hover:from-blue-600/25 hover:to-cyan-600/25 text-blue-700 dark:text-cyan-300 rounded-xl transition-all flex items-center gap-2 border border-blue-300 dark:border-blue-700 shadow-sm cursor-pointer"
+                title="View Saved Vehicles & Listings"
+              >
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {(authUser.user_metadata?.full_name || authUser.email || 'U').charAt(0).toUpperCase()}
+                </div>
+                <span className="hidden sm:inline max-w-[100px] truncate">
+                  {authUser.user_metadata?.full_name || authUser.email?.split('@')[0]}
+                </span>
+                {favoriteCarsCount > 0 && (
+                  <span className="px-1.5 py-0.2 text-[9px] rounded-full bg-rose-500 text-white font-bold">
+                    {favoriteCarsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                id="btn-nav-list-car"
+                onClick={onOpenCreateListing}
+                className="hidden md:flex px-2.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-sm items-center gap-1 cursor-pointer transition-all"
+                title="List a vehicle for sale"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>List Car</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              id="btn-nav-auth-login"
+              onClick={onOpenAuthModal}
+              className="px-3 py-1.5 text-xs font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In / Join</span>
+            </button>
+          )}
+
           {/* Admin Portal Button */}
           <button
             id="btn-nav-admin"
@@ -267,6 +321,56 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Mobile Responsive Navigation Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-4 space-y-2 animate-fadeIn">
+          {/* User Status Bar in Mobile Menu */}
+          {authUser ? (
+            <div className="p-3 mb-2 bg-blue-50 dark:bg-blue-950/60 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                  {(authUser.user_metadata?.full_name || authUser.email || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    {authUser.user_metadata?.full_name || authUser.email?.split('@')[0]}
+                  </p>
+                  <p className="text-[10px] text-slate-500 font-mono">{authUser.email}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenUserProfile();
+                }}
+                className="px-2.5 py-1 bg-blue-600 text-white text-xs font-bold rounded-lg"
+              >
+                Profile
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenAuthModal();
+              }}
+              className="w-full mb-2 p-3 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In / Create Account</span>
+            </button>
+          )}
+
+          {authUser && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenCreateListing();
+              }}
+              className="w-full p-3 rounded-xl text-left text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4 text-cyan-600" />
+              <span>List a Vehicle for Sale</span>
+            </button>
+          )}
           <button
             onClick={() => {
               setActiveTab('catalog');
